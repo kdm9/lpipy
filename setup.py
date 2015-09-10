@@ -16,11 +16,6 @@ class NoseCommand(TestCommand):
         import nose
         nose.run_exit(argv=['nosetests'])
 
-versioneer.VCS = 'git'
-versioneer.versionfile_source = 'lpi/_version.py'
-versioneer.versionfile_build = 'lpi/_version.py'
-versioneer.tag_prefix = ''
-versioneer.parentdir_prefix = 'lpi-'
 
 desc = """
 LPI.py: Lineage Probablity Index calculation
