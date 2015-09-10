@@ -71,11 +71,12 @@ setup(
         "Development Status :: 3 - Alpha",
         "Environment :: Console",
         "Intended Audience :: Developers",
+        "Intended Audience :: Science/Research",
         "Operating System :: OS Independent",
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
-        "License :: OSI Approved :: GNU General Public License v3 or later " +
-            "(GPLv3+)",
+        ("License :: OSI Approved :: GNU Lesser General Public License v3 or "
+         "later (LGPLv3+)"),
     ],
     test_suite="lpi.test",
 )
