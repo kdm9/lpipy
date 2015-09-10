@@ -1,0 +1,33 @@
+*.swp
+# SRA files left lying around
+*.sra
+
+# python compiled files
+*.pyc
+*.pyo
+
+# testing
+.coverage
+.tox
+
+# Packages
+*.egg
+*.eggs
+*.egg-info
+dist
+build
+eggs
+parts
+bin
+var
+sdist
+develop-eggs
+.installed.cfg
+MANIFEST
+.ipynb_checkpoints
+
+# Installer logs
+pip-log.txt
+
+# HTML Coverage report
+cover/
