@@ -2,6 +2,8 @@ from __future__ import absolute_import, division, print_function
 
 from .taxonomy import (
     NCBITaxonomyDB,
+    ALL_RANKS,
+    DEFAULT_RANKS,
 )
 from .blast import (
     SeqID,
@@ -17,4 +19,6 @@ __all__ = [
     "NCBITaxonomyDB",
     "BlastFile",
     "SeqID",
+    "ALL_RANKS",
+    "DEFAULT_RANKS",
 ]

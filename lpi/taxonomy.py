@@ -23,9 +23,46 @@ from .utils import (
 )
 
 
-__all__ = ["NCBITaxonomyDB"]
+__all__ = [
+    "NCBITaxonomyDB",
+    "ALL_RANKS",
+    "DEFAULT_RANKS",
+]
+
 
 DB_VERSION = 1
+
+ALL_RANKS = [  # TODO: sort this by some logical order
+    'no rank',
+    'superkingdom',
+    'genus',
+    'species',
+    'order',
+    'family',
+    'subspecies',
+    'subfamily',
+    'tribe',
+    'phylum',
+    'class',
+    'forma',
+    'suborder',
+    'superclass',
+    'subclass',
+    'varietas',
+    'kingdom',
+    'subphylum',
+    'superfamily',
+    'infraorder',
+    'infraclass',
+    'superorder',
+    'subgenus',
+    'parvorder',
+    'superphylum',
+    'species group',
+    'species subgroup',
+    'subtribe',
+    'subkingdom',
+]
 DEFAULT_RANKS = [
     'species',
     'genus',
@@ -295,7 +332,7 @@ class NCBITaxonomyDB(object):
         qry = c.execute("SELECT taxid FROM sequences WHERE gi = ?", (gi,))
         res = qry.fetchone()
         if not res:
-            raise ValueError("GI {} not found in database".format(gi))
+            raise KeyError("GI {} not found in database".format(gi))
         return res[0]
 
     def taxon_parents(self, taxid):
