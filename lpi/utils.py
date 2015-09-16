@@ -9,6 +9,7 @@ from six.moves.configparser import ConfigParser
 
 
 LOG = None
+LOGLEVEL = logging.DEBUG
 
 
 def get_config():
@@ -42,19 +43,19 @@ def get_data_file(filename):
     return datadir
 
 
-def init_logger(name='lpi', quiet=False, level=logging.DEBUG):
+def init_logger(name='lpi', quiet=False, level=LOGLEVEL):
     log = logging.getLogger(name)
     log.setLevel(level)
 
     if not quiet:
         stdout = logging.StreamHandler(stream=sys.stderr)
-        stdout.setLevel(logging.INFO)
+        stdout.setLevel(logging.DEBUG)
         log.addHandler(stdout)
 
     return log
 
 
-def get_logger(quiet=False, level=logging.DEBUG):
+def get_logger(quiet=False, level=LOGLEVEL):
     global LOG
     if not LOG:
         LOG = init_logger('lpi', quiet, level)
@@ -65,7 +66,7 @@ def download_file(url, filename, chunk_size=128 * 1024):
     log = get_logger()
     req = requests.get(url, stream=True)
     cnt = 0
-    log.info("Downloading {} to {}".format(url, filename))
+    log.info("Downloading %s to %s", url, filename)
     with open(filename, 'wb') as fh:
         for chunk in req.iter_content(chunk_size):
             cnt += len(chunk)

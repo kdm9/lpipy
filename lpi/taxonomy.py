@@ -4,6 +4,7 @@ NCBI Taxonomy database handling.
 
 from __future__ import absolute_import, division, print_function
 from collections import OrderedDict
+import gzip
 import json
 import os
 from os import path
@@ -22,7 +23,7 @@ from .utils import (
 )
 
 
-__all__ = ["NCBITaxa"]
+__all__ = ["NCBITaxonomyDB"]
 
 DB_VERSION = 1
 DEFAULT_RANKS = [
@@ -38,54 +39,67 @@ DEFAULT_RANKS = [
 
 LOG = get_logger()
 
-class NCBITaxa(object):
+class NCBITaxonomyDB(object):
     '''
     Provides a local transparent connector to the NCBI taxonomy database.
     '''
-    db = None
+    _db = None
+    metadata = {
+        "db_version": DB_VERSION,
+        "db_complete": False,
+        "taxdump_md5": '',
+        "gi_taxid_nucl_md5": '',
+        "gi_taxid_prot_md5": '',
+    }
+
 
     def __init__(self, dbfile=None):
 
-        self.dbfile = dbfile
-        if not self.dbfile:
-            self.dbfile = get_data_file('taxa.sqlite')
+        self._dbfile = dbfile
+        if not self._dbfile:
+            self._dbfile = get_data_file('taxa.sqlite')
 
         self._connect()
 
     def _connect(self):
-        if self.db:
+        if self._db:
             # No-op if we have a db handle
             return
         try:
-            self.db = sqlite3.connect(self.dbfile)
-            with open(self.dbfile + '.info') as fh:
+            self._db = sqlite3.connect(self._dbfile)
+            with open(self._dbfile + '.info') as fh:
                 self.metadata = json.load(fh)
             if self.metadata["db_version"] != DB_VERSION:
                 raise ValueError("Invalid DB version")
+            if not self.metadata["db_complete"]:
+                raise ValueError("Incomplete DB")
+            LOG.debug('Taxonomy DB loaded successfully')
         except Exception:
             LOG.info('Taxonomy DB not valid, (re-)creating')
             self._wipe_db()
             self._create_db()
 
     def _write_metadata(self):
-        with open(self.dbfile + '.info', 'w') as fh:
+        with open(self._dbfile + '.info', 'w') as fh:
             json.dump(self.metadata, fh)
 
     def _wipe_db(self):
+        LOG.debug('Wiping sqlite taxonomy database')
         try:
-            os.remove(self.dbfile)
+            os.remove(self._dbfile)
         except Exception:
             pass
         try:
-            os.remove(self.dbfile + '.info')
+            os.remove(self._dbfile + '.info')
         except Exception:
             pass
 
     def _create_db(self):
         """Creates the structure in the sqlite DB and opens a connection to the
         database."""
-        self.db = sqlite3.connect(self.dbfile)
-        c = self.db.cursor()
+        LOG.debug('Creating sqlite taxonomy database')
+        self._db = sqlite3.connect(self._dbfile)
+        c = self._db.cursor()
         c.execute("""CREATE TABLE merges (
                         oldid INTEGER PRIMARY KEY,
                         newid INTEGER
@@ -107,15 +121,8 @@ class NCBITaxa(object):
                         FOREIGN KEY (taxid) REFERENCES taxa(taxid),
                         FOREIGN KEY (parent) REFERENCES taxa(taxid)
                         );""")
-        self.db.commit()
-
-        self.metadata = {
-            "db_version": DB_VERSION,
-            "taxdump_md5": '',
-            "gi_taxid_nucl_md5": '',
-            "gi_taxid_prot_md5": '',
-        }
-
+        c.execute("CREATE INDEX parents_taxid ON parents (taxid)")
+        self._db.commit()
         self._write_metadata()
         self._load_db()
 
@@ -126,16 +133,16 @@ class NCBITaxa(object):
 
         taxdump_remote_hash = read_remote_file(taxdump_url + '.md5').split()[0]
 
-        def download_taxdump():
-            download_file(taxdump_url, taxdump_file)
-            self.metadata['taxdump_md5'] = taxdump_remote_hash
+        if path.exists(taxdump_file):
+            LOG.debug("Taxdump file found, calculating checksum")
+            self.metadata['taxdump_md5'] = md5sum(taxdump_file)
 
-        if not path.exists(taxdump_file):
-            LOG.info("Taxdump file not found, downloading it")
-            download_taxdump()
-        elif taxdump_remote_hash != self.metadata.get('taxdump_md5', ''):
+        while taxdump_remote_hash != self.metadata.get('taxdump_md5', ''):
             LOG.info("Taxdump file out of date, downloading it")
-            download_taxdump()
+            download_file(taxdump_url, taxdump_file)
+            self.metadata['taxdump_md5'] = md5sum(taxdump_file)
+
+        LOG.debug("We have a valid Taxdump file")
 
         self._write_metadata()
 
@@ -151,20 +158,26 @@ class NCBITaxa(object):
             sect_hash_key = 'gi_taxid_{}_md5'.format(sect)
             sect_local_hash = self.metadata.get(sect_hash_key, '')
 
+            if path.exists(sect_file):
+                LOG.debug("GI to tax %s file found, calculating checksum",
+                          sect)
+                self.metadata[sect_hash_key] = md5sum(sect_file)
+
             while self.metadata[sect_hash_key] != sect_remote_hash:
                 download_file(sect_url, sect_file)
                 self.metadata[sect_hash_key] = md5sum(sect_file)
-
+            LOG.debug("We have a valid gi_taxid_%s file", sect)
         self._write_metadata()
 
     def _load_db(self):
         # up to here, transfer it from the other files from ~/ws/lpi
+        LOG.debug('Loading taxonomy database from NCBI dump files')
         self._get_taxdump_file()
         self._get_gitax_file()
 
         taxdump_file = get_data_file('taxdump.tar.gz')
         tar = tarfile.open(taxdump_file)
-        cursor = self.db.cursor()
+        cursor = self._db.cursor()
 
         def dmpfile(filename):
             with tar.extractfile(filename) as fh:
@@ -196,7 +209,7 @@ class NCBITaxa(object):
             oldid, newid = map(int, ids)
             cursor.execute("INSERT INTO merges VALUES (?, ?)", (oldid, newid))
 
-        LOG.info("Loaded data files")
+        LOG.debug("Loaded data files")
 
         # The tree is stored a a dict of {taxid: [taxid, parent, ..., 1]}
         # for each parent in the tree to the root.
@@ -228,45 +241,46 @@ class NCBITaxa(object):
                     heirarchy = subtree[i + 1:]
                     tree[thisid] = heirarchy
 
-        LOG.info("Created tree (with", len(tree), "records)")
-        count = 0
-        for taxid, parents in tree.items():
+        LOG.debug("Created taxa tree")
+
+        for i, (taxid, parents) in enumerate(tree.items()):
             parent_items = [(taxid, par, i) for i, par in enumerate(parents)]
             cursor.executemany("INSERT INTO parents VALUES (?, ?, ?)",
                                parent_items)
             cursor.execute("INSERT INTO taxa VALUES (?, ?, ?)",
                            (taxid, names[taxid], ranks[taxid]))
-            if len(taxa) > 100000:
-                count += 100
-                LOG.info("Inserted {}K records".format(count))
+            if i % 100000 == 0:
+                LOG.debug("Inserted %0.2fM taxa", i / 1000000)
 
-        LOG.info("Loaded tree into DB")
-        LOG.info("Finished loading taxonomy")
-        self.db.commit()
+        LOG.debug("Created taxa database (with %d records)", len(tree))
+        self._db.commit()
 
-        gi_tax_file = get_data_file('gi_taxid_{sect}.dmp.gz')
-
+        LOG.debug("Creating sequence GI to taxid database")
         for sect in ['prot', 'nucl']:
-            filename = gi_tax_file.format(sect=sect)
+            filename = get_data_file('gi_taxid_{}.dmp.gz').format(sect)
+            LOG.debug("Loading 'gi_taxid_%s.dmp.gz'", sect)
             with gzip.open(filename) as fh:
                 pairs = []
                 for i, line in enumerate(fh):
                     gi, taxid = map(int, line.strip().split())
                     pairs.append((gi, taxid))
-                    if i % 100000 == 0:
+                    if i % 1000000 == 0:
                         cursor.executemany(
                             "INSERT INTO sequences VALUES (?, ?)",
                             pairs
                         )
                         pairs[:] = []
-                        LOG.info("{:0.2f}M GIs loaded".format(i/1000000))
-            LOG.info("Finished loading GIs")
-            self.db.commit()
+                        LOG.debug("%0.0fM %s GIs loaded", i/1000000, sect)
+            self._db.commit()
+        LOG.debug("Finished loading sequences ID to taxid database")
+        LOG.info("Loaded taxonomy and sequence data into database")
+        self.metadata["db_complete"] = True
+        self._write_metadata()
 
     def get_merged_taxid(self, taxid):
         '''Convert an old taxid to it's up-to-date ID, or return the orginal
         taxid'''
-        qry = self.db.execute('''SELECT newid FROM merges
+        qry = self._db.execute('''SELECT newid FROM merges
                                  WHERE oldid = ?''', (taxid, ))
         newid = qry.fetchone()
         if newid:
@@ -277,7 +291,7 @@ class NCBITaxa(object):
         # Ensure GI is an integer
         gi = int(gi)
 
-        c = self.db.cursor()
+        c = self._db.cursor()
         qry = c.execute("SELECT taxid FROM sequences WHERE gi = ?", (gi,))
         res = qry.fetchone()
         if not res:
@@ -285,7 +299,7 @@ class NCBITaxa(object):
         return res[0]
 
     def taxon_parents(self, taxid):
-        c = self.db.cursor()
+        c = self._db.cursor()
         qry = c.execute("""SELECT parents.parent, taxa.rank, taxa.name
                            FROM parents
                            INNER JOIN taxa ON taxa.taxid = parents.parent
@@ -297,10 +311,14 @@ class NCBITaxa(object):
 
     def taxon_lineage(self, taxid, ranks=DEFAULT_RANKS):
         ranks = set(ranks)
-        taxid = self.get_merged_id(taxid)
+        taxid = self.get_merged_taxid(taxid)
         namedheir = OrderedDict()
         for taxid, rank, name in self.taxon_parents(taxid):
             if rank in ranks:
                 namedheir[rank] = {'taxid': taxid, 'name': name}
         return namedheir
+
+    def sequence_lineage(self, gi, ranks=DEFAULT_RANKS):
+        taxid = self.gi_to_taxid(gi)
+        return self.taxon_lineage(taxid)
 

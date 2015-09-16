@@ -28,6 +28,7 @@ setup_requires = [
 
 install_requires = [
     'six',
+    'requests',
     'docopt',
 ]
 
