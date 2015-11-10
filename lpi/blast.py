@@ -6,6 +6,7 @@ from __future__ import division, absolute_import, print_function
 from collections import namedtuple
 import pandas as pd
 
+
 class SeqID(object):
     _id_types = []
 

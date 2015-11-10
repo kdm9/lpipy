@@ -8,6 +8,7 @@ from .taxonomy import (
 from .blast import (
     SeqID,
     BlastFile,
+    parse_blast_groupby,
 )
 
 
@@ -16,9 +17,10 @@ __version__ = get_versions()['version']
 del get_versions
 
 __all__ = [
-    "NCBITaxonomyDB",
-    "BlastFile",
-    "SeqID",
-    "ALL_RANKS",
-    "DEFAULT_RANKS",
+    'NCBITaxonomyDB',
+    'BlastFile',
+    'parse_blast_groupby',
+    'SeqID',
+    'ALL_RANKS',
+    'DEFAULT_RANKS',
 ]

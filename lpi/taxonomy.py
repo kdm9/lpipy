@@ -24,9 +24,9 @@ from .utils import (
 
 
 __all__ = [
-    "NCBITaxonomyDB",
-    "ALL_RANKS",
-    "DEFAULT_RANKS",
+    'NCBITaxonomyDB',
+    'ALL_RANKS',
+    'DEFAULT_RANKS',
 ]
 
 
