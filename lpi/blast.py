@@ -146,15 +146,13 @@ def parse_blast_queries(filename, fields=DEFAULT_BLAST_FIELDS, filter='',
     more details on filtering.
     '''
 
-    '''
-    Algorithm:
-     - keep a dictonary of unfinished queries.
-     - for each chunk, for all unfinished queries, check if they don't appear
-       in the current chunk, if they don't, yield them
-     - otherwise, append or add the current queries to the dict of unfinished
-       queries.
-     - finally, return all query: dataframe pairs.
-    '''
+    # Algorithm:
+    #  - keep a dictonary of unfinished queries.
+    #  - for each chunk, for all unfinished queries, check if they don't appear
+    #    in the current chunk, if they don't, yield them.
+    #  - otherwise, append or add the current queries to the dict of unfinished
+    #    queries.
+    #  - finally, return all query: dataframe pairs.
 
     lastgroups = {}
     for chunk in pd.read_table(filename, names=fields, chunksize=chunksize):
