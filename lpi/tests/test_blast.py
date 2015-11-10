@@ -79,17 +79,19 @@ def __do_test_parse_blast_queries(parser, json_sseqid_file):
         assert all(df.qseqid == expt_query)
         assert all(df.sseqid == expt_sseqids)
 
+
 def test_parse_blast_queries():
     '''Check that hits are grouped correctly into query-wise `pd.DataFrame`s.
     '''
     __do_test_parse_blast_queries(
-        blast.parse_blast_queries(helpers.get_data_file('50_blast_hits.tab')),
+        blast.parse_blast_groupby(helpers.get_data_file('50_blast_hits.tab')),
         helpers.get_data_file('50_blast_hits_sseqids.json')
     )
 
+
 def test_parse_blast_queries_filtering():
     __do_test_parse_blast_queries(
-        blast.parse_blast_queries(helpers.get_data_file('50_blast_hits.tab'),
+        blast.parse_blast_groupby(helpers.get_data_file('50_blast_hits.tab'),
                                   filter='evalue < 1e-150'),
         helpers.get_data_file('50_blast_hits_sseqids_1e-150.json')
     )

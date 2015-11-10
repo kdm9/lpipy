@@ -135,7 +135,8 @@ class BlastFile(object):
             self.fh.close()
 
 
-def parse_blast_queries(filename, fields=DEFAULT_BLAST_FIELDS, filter='',
+def parse_blast_groupby(filename, group_by=['qseqid', ],
+                        fields=DEFAULT_BLAST_FIELDS, filter='',
                         chunksize=5000):
     '''Iterate over a blast table, parsing each query's hits into a separate
     pandas data frame. Assumes the table is sorted by query sequence ID.
@@ -158,7 +159,7 @@ def parse_blast_queries(filename, fields=DEFAULT_BLAST_FIELDS, filter='',
     for chunk in pd.read_table(filename, names=fields, chunksize=chunksize):
         if filter:
             chunk = chunk.query(filter)
-        groups = {k:df for k, df in chunk.groupby(['qseqid',])}
+        groups = {k: df for k, df in chunk.groupby(group_by)}
         # To avoid changing dict len when popping in a for loop, we keep track
         # of things we have yeild-ed and therefore want to pop outside of the
         # loop (in the next one).
