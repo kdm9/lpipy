@@ -66,18 +66,30 @@ def test_parse_blast_default():
             'bitscore': 125,},
            ])
 
-def test_parse_blast_queries():
-    '''Check that hits are grouped correctly into query-wise `pd.DataFrame`s.
-    '''
-    filename = helpers.get_data_file('50_blast_hits.tab')
-    parser = blast.parse_blast_queries(filename)
-    with open(helpers.get_data_file('50_blast_hits_sseqids.json')) as jsonfh:
-        # Loads a dict of {'qseqid': ['sseqid1', 'sseqid2', ...]}
-        expect = json.load(jsonfh)
 
-    for (query, df), (expt_query, expt_sseqids) in zip(parser, expect.items()):
+def __do_test_parse_blast_queries(parser, json_sseqid_file):
+    # ensure the order of the parsed queries is consistent
+    parser = sorted((q, df) for q, df in parser)
+    with open(helpers.get_data_file(json_sseqid_file)) as jsonfh:
+        # Loads a dict of {'qseqid': ['sseqid1', 'sseqid2', ...]}
+        expect = sorted((q, sseqs) for q, sseqs in json.load(jsonfh).items())
+
+    for (query, df), (expt_query, expt_sseqids) in zip(parser, expect):
         assert query == expt_query
         assert all(df.qseqid == expt_query)
         assert all(df.sseqid == expt_sseqids)
 
+def test_parse_blast_queries():
+    '''Check that hits are grouped correctly into query-wise `pd.DataFrame`s.
+    '''
+    __do_test_parse_blast_queries(
+        blast.parse_blast_queries(helpers.get_data_file('50_blast_hits.tab')),
+        helpers.get_data_file('50_blast_hits_sseqids.json')
+    )
 
+def test_parse_blast_queries_filtering():
+    __do_test_parse_blast_queries(
+        blast.parse_blast_queries(helpers.get_data_file('50_blast_hits.tab'),
+                                  filter='evalue < 1e-150'),
+        helpers.get_data_file('50_blast_hits_sseqids_1e-150.json')
+    )

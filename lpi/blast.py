@@ -135,12 +135,36 @@ class BlastFile(object):
             self.fh.close()
 
 
-def parse_blast_queries(filename, fields=DEFAULT_BLAST_FIELDS, query='',
+def parse_blast_queries(filename, fields=DEFAULT_BLAST_FIELDS, filter='',
                         chunksize=5000):
+    '''Iterate over a blast table, parsing each query's hits into a separate
+    pandas data frame. Assumes the table is sorted by query sequence ID.
+
+    Field names must be specified if a format other than the standard '-outfmt
+    6' tabular format is being parsed. An optional filter on table columns may
+    be provided, e.g 'evalue < 1e-10'. See ``pandas.DataFrame.query()`` for
+    more details on filtering.
+    '''
+
+    '''
+    Algorithm:
+     - keep a dictonary of unfinished queries.
+     - for each chunk, for all unfinished queries, check if they don't appear
+       in the current chunk, if they don't, yield them
+     - otherwise, append or add the current queries to the dict of unfinished
+       queries.
+     - finally, return all query: dataframe pairs.
+    '''
+
     lastgroups = {}
     for chunk in pd.read_table(filename, names=fields, chunksize=chunksize):
+        if filter:
+            chunk = chunk.query(filter)
         groups = {k:df for k, df in chunk.groupby(['qseqid',])}
-        to_pop = []  # To avoid changing dict len by popping in a for loop
+        # To avoid changing dict len when popping in a for loop, we keep track
+        # of things we have yeild-ed and therefore want to pop outside of the
+        # loop (in the next one).
+        to_pop = []
         for key in lastgroups:
             if key in groups:
                 lastgroups[key] = pd.concat((lastgroups[key], df))
