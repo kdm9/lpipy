@@ -4,6 +4,7 @@ Parse blast tabular formats
 
 from __future__ import division, absolute_import, print_function
 from collections import namedtuple
+import pandas as pd
 
 class SeqID(object):
     _id_types = []
@@ -34,8 +35,6 @@ class SeqID(object):
             if getattr(self, id_type) != getattr(other, id_type):
                 return False
         return True
-
-
 
 
 BLAST_FIELDS = {
@@ -134,3 +133,23 @@ class BlastFile(object):
     def __exit__(self):
         if self.fh:
             self.fh.close()
+
+
+def parse_blast_queries(filename, fields=DEFAULT_BLAST_FIELDS, query='',
+                        chunksize=5000):
+    lastgroups = {}
+    for chunk in pd.read_table(filename, names=fields, chunksize=chunksize):
+        groups = {k:df for k, df in chunk.groupby(['qseqid',])}
+        to_pop = []  # To avoid changing dict len by popping in a for loop
+        for key in lastgroups:
+            if key in groups:
+                lastgroups[key] = pd.concat((lastgroups[key], df))
+            else:
+                to_pop.append(key)
+                yield key, lastgroups[key]
+        for key in to_pop:
+            lastgroups.pop(key)
+        for key, df in groups.items():
+            lastgroups[key] = df
+    for key, df in lastgroups.items():
+        yield key, df

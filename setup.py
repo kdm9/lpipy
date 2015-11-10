@@ -30,6 +30,7 @@ install_requires = [
     'six',
     'requests',
     'docopt',
+    'pandas',
 ]
 
 test_requires = [

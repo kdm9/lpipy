@@ -5,6 +5,7 @@ Test of lpi.blast module
 from __future__ import division, absolute_import, print_function
 from nose.tools import assert_raises
 from nose import tools as nt
+import json
 from lpi import blast
 from . import helpers
 
@@ -64,5 +65,19 @@ def test_parse_blast_default():
             'evalue': 2e-34,
             'bitscore': 125,},
            ])
+
+def test_parse_blast_queries():
+    '''Check that hits are grouped correctly into query-wise `pd.DataFrame`s.
+    '''
+    filename = helpers.get_data_file('50_blast_hits.tab')
+    parser = blast.parse_blast_queries(filename)
+    with open(helpers.get_data_file('50_blast_hits_sseqids.json')) as jsonfh:
+        # Loads a dict of {'qseqid': ['sseqid1', 'sseqid2', ...]}
+        expect = json.load(jsonfh)
+
+    for (query, df), (expt_query, expt_sseqids) in zip(parser, expect.items()):
+        assert query == expt_query
+        assert all(df.qseqid == expt_query)
+        assert all(df.sseqid == expt_sseqids)
 
 
